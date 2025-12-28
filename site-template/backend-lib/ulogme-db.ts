@@ -7,41 +7,27 @@
 import { DuckDBInstance, DuckDBConnection } from "@duckdb/node-api";
 import { join, dirname } from "path";
 
-// Path to the DuckDB database (in the parent new/ directory)
+// Path to the DuckDB database (in the parent directory)
 const DB_PATH = join(dirname(dirname(import.meta.dir)), "data", "ulogme.duckdb");
 
-let instance: DuckDBInstance | null = null;
-let connection: DuckDBConnection | null = null;
-
 /**
- * Get or create the DuckDB connection.
- * Opens in read-only mode to allow concurrent access with the tracker daemon.
+ * Get a fresh DuckDB connection.
+ * Opens in read-only mode and creates a new connection each time
+ * to see the latest data written by the tracker.
  */
 export async function getConnection(): Promise<DuckDBConnection> {
-  if (connection !== null) {
-    return connection;
-  }
-
-  // Open in read-only mode to allow concurrent access with the tracker
-  instance = await DuckDBInstance.create(DB_PATH, {
+  const instance = await DuckDBInstance.create(DB_PATH, {
     access_mode: "READ_ONLY",
   });
-  connection = await instance.connect();
-
-  return connection;
+  return await instance.connect();
 }
 
 /**
- * Close the database connection.
+ * Close a database connection.
  */
-export async function closeConnection(): Promise<void> {
-  if (connection !== null) {
-    // DuckDB node-api doesn't have an explicit close method on connection
-    connection = null;
-  }
-  if (instance !== null) {
-    instance = null;
-  }
+export async function closeConnection(conn: DuckDBConnection): Promise<void> {
+  // DuckDB node-api connections are cleaned up when they go out of scope
+  // This is a no-op but kept for API compatibility
 }
 
 // Type definitions for ulogme data
