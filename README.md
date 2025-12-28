@@ -22,6 +22,16 @@ All data stays on your machine in a local DuckDB database. There are no cloud se
 - 📝 Add notes and daily blog entries
 - ⚡ Fast DuckDB storage with powerful analytics queries
 
+## Screenshots
+
+### Overview Dashboard
+![Overview](screenshots/overview.png)
+
+### Day View
+![Day View](screenshots/day-view.png)
+
+![Day View - Charts](screenshots/day-view-2.png)
+
 ## Quick Start
 
 ### Prerequisites
