@@ -1,0 +1,7 @@
+{
+  "name": "zosite",
+  "local_port": 12345,
+  "publish": {
+    "published_port": 12347
+  }
+}
