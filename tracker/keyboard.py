@@ -33,6 +33,7 @@ class KeystrokeCounter:
         self._last_flush = time.time()
         self._monitor: Any = None
         self._running = False
+        self.verbose = False
     
     def _handle_key_event(self, event) -> None:
         """Handle a key down event by incrementing the counter."""
@@ -52,6 +53,8 @@ class KeystrokeCounter:
                 self._last_flush = now
             
             if count > 0:
+                if self.verbose:
+                    print(f"  -> flushing {count} keystrokes", flush=True)
                 timestamp = datetime.now()
                 logical_date = rewind_to_logical_day(
                     int(timestamp.timestamp()),
@@ -63,6 +66,8 @@ class KeystrokeCounter:
                     key_count=count,
                     logical_date=logical_date,
                 )
+            elif self.verbose:
+                print(f"  -> no keystrokes to flush", flush=True)
     
     def poll(self) -> None:
         """Check if we need to flush. Called periodically by the daemon."""

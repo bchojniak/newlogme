@@ -37,6 +37,7 @@ class WindowTracker:
         self._chrome_script: NSAppleScript | None = None
         self._safari_script: NSAppleScript | None = None
         self._arc_script: NSAppleScript | None = None
+        self.verbose = False
     
     def _get_chrome_url_script(self) -> NSAppleScript:
         """Get cached AppleScript for Chrome URL."""
@@ -189,6 +190,9 @@ class WindowTracker:
             int(now.timestamp()),
             self.config.day_boundary_hour
         )
+        
+        if self.verbose:
+            print(f"  -> window: {name_to_log[:60]}...", flush=True)
         
         self.storage.insert_window_event(
             timestamp=now,

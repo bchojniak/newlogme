@@ -22,7 +22,7 @@ def print_usage() -> None:
     print("""ulogme - Modern activity tracker for macOS
 
 Usage:
-    uv run python -m tracker <command>
+    uv run python -m tracker <command> [options]
 
 Commands:
     start, run    Start the tracker daemon in foreground
@@ -31,9 +31,15 @@ Commands:
     install       Install as a launchd service (auto-start on login)
     uninstall     Remove the launchd service
 
+Options:
+    --verbose, -v    Print debug output (poll ticks, keystroke flushes)
+
 Examples:
     # Start tracking in foreground
     uv run python -m tracker start
+
+    # Start with debug output
+    uv run python -m tracker start --verbose
 
     # Install as a service that starts on login
     uv run python -m tracker install
@@ -53,12 +59,13 @@ def main() -> None:
         sys.exit(1)
     
     command = sys.argv[1].lower()
+    verbose = "--verbose" in sys.argv or "-v" in sys.argv
     
     # Load config once
     config = load_config()
     
     if command in ("start", "run"):
-        run_daemon(config)
+        run_daemon(config, verbose=verbose)
     elif command == "stop":
         stop_daemon(config)
     elif command == "status":

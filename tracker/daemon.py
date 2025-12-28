@@ -28,6 +28,7 @@ class DaemonDelegate(NSObject):
     
     tracker: WindowTracker | None = None
     counter: KeystrokeCounter | None = None
+    verbose: bool = False
     
     def applicationDidFinishLaunching_(self, notification) -> None:
         """Called when the application has finished launching."""
@@ -35,6 +36,9 @@ class DaemonDelegate(NSObject):
     
     def pollCallback_(self, timer) -> None:
         """Periodic callback for polling window and flushing keystrokes."""
+        if self.verbose:
+            from datetime import datetime
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] poll tick", flush=True)
         if self.tracker is not None:
             self.tracker.poll()
         if self.counter is not None:
@@ -46,11 +50,14 @@ class Daemon:
     The main daemon class that coordinates all tracking.
     """
     
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, verbose: bool = False):
         self.config = config
+        self.verbose = verbose
         self.storage = Storage(config)
         self.tracker = WindowTracker(config, self.storage)
+        self.tracker.verbose = verbose
         self.counter = KeystrokeCounter(config, self.storage)
+        self.counter.verbose = verbose
         self._running = False
         self._observer: Any = None
         self._key_monitor: Any = None
@@ -71,6 +78,7 @@ class Daemon:
         self._delegate = DaemonDelegate.alloc().init()
         self._delegate.tracker = self.tracker
         self._delegate.counter = self.counter
+        self._delegate.verbose = self.verbose
         
         NSApp().setDelegate_(self._delegate)
         
@@ -169,12 +177,13 @@ def remove_pid_file(config: Config) -> None:
     pid_file.unlink(missing_ok=True)
 
 
-def run_daemon(config: Config | None = None) -> None:
+def run_daemon(config: Config | None = None, verbose: bool = False) -> None:
     """
     Run the daemon in the foreground.
     
     Args:
         config: Configuration to use. If None, loads from default location.
+        verbose: If True, print debug output
     """
     if config is None:
         config = load_config()
@@ -189,7 +198,7 @@ def run_daemon(config: Config | None = None) -> None:
     write_pid_file(config)
     
     try:
-        daemon = Daemon(config)
+        daemon = Daemon(config, verbose=verbose)
         daemon.start()
     finally:
         remove_pid_file(config)
