@@ -104,24 +104,57 @@ def _ensure_schema(conn: duckdb.DuckDBPyConnection) -> None:
 
 
 class Storage:
-    """Storage interface for ulogme data."""
+    """Storage interface for ulogme data.
+    
+    Opens and closes the database connection for each operation to allow
+    concurrent read access from the web server.
+    """
     
     def __init__(self, config: Config):
         self.config = config
-        self._conn: duckdb.DuckDBPyConnection | None = None
+        self._schema_initialized = False
     
-    @property
-    def conn(self) -> duckdb.DuckDBPyConnection:
-        """Get or create the database connection."""
-        if self._conn is None:
-            self._conn = get_connection(self.config)
-        return self._conn
+    def _get_conn(self) -> duckdb.DuckDBPyConnection:
+        """Get a fresh database connection."""
+        conn = get_connection(self.config)
+        return conn
+    
+    def _execute(self, query: str, params: list | None = None) -> None:
+        """Execute a write query, opening and closing the connection."""
+        conn = self._get_conn()
+        try:
+            if params:
+                conn.execute(query, params)
+            else:
+                conn.execute(query)
+        finally:
+            conn.close()
+    
+    def _query(self, query: str, params: list | None = None):
+        """Execute a read query, returning results."""
+        conn = self._get_conn()
+        try:
+            if params:
+                return conn.execute(query, params).fetchall()
+            else:
+                return conn.execute(query).fetchall()
+        finally:
+            conn.close()
+    
+    def _query_one(self, query: str, params: list | None = None):
+        """Execute a read query, returning one result."""
+        conn = self._get_conn()
+        try:
+            if params:
+                return conn.execute(query, params).fetchone()
+            else:
+                return conn.execute(query).fetchone()
+        finally:
+            conn.close()
     
     def close(self) -> None:
-        """Close the database connection."""
-        if self._conn is not None:
-            self._conn.close()
-            self._conn = None
+        """Close any resources (no-op now, connections are closed after each operation)."""
+        pass
     
     # Window events
     
@@ -134,7 +167,7 @@ class Storage:
         browser_url: str | None = None,
     ) -> None:
         """Insert a window event."""
-        self.conn.execute(
+        self._execute(
             """
             INSERT INTO window_events (timestamp, app_name, window_title, browser_url, logical_date)
             VALUES (?, ?, ?, ?, ?)
@@ -147,7 +180,7 @@ class Storage:
     
     def get_window_events_for_date(self, logical_date: date) -> list[dict[str, Any]]:
         """Get all window events for a logical date."""
-        result = self.conn.execute(
+        result = self._query(
             """
             SELECT timestamp, app_name, window_title, browser_url
             FROM window_events
@@ -155,7 +188,7 @@ class Storage:
             ORDER BY timestamp
             """,
             [logical_date],
-        ).fetchall()
+        )
         
         return [
             {
@@ -169,14 +202,14 @@ class Storage:
     
     def get_last_window_event(self) -> dict[str, Any] | None:
         """Get the most recent window event."""
-        result = self.conn.execute(
+        result = self._query_one(
             """
             SELECT timestamp, app_name, window_title, browser_url
             FROM window_events
             ORDER BY timestamp DESC
             LIMIT 1
             """
-        ).fetchone()
+        )
         
         if result is None:
             return None
@@ -197,7 +230,7 @@ class Storage:
         logical_date: date,
     ) -> None:
         """Insert a keystroke count event."""
-        self.conn.execute(
+        self._execute(
             """
             INSERT INTO key_events (timestamp, key_count, logical_date)
             VALUES (?, ?, ?)
@@ -209,7 +242,7 @@ class Storage:
     
     def get_key_events_for_date(self, logical_date: date) -> list[dict[str, Any]]:
         """Get all key events for a logical date."""
-        result = self.conn.execute(
+        result = self._query(
             """
             SELECT timestamp, key_count
             FROM key_events
@@ -217,7 +250,7 @@ class Storage:
             ORDER BY timestamp
             """,
             [logical_date],
-        ).fetchall()
+        )
         
         return [
             {"timestamp": row[0], "key_count": row[1]}
