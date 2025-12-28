@@ -1,10 +1,54 @@
-render/events_*json
-.env
-logs
-*.swp
-*.pyc
-old
+# OS
 .DS_Store
-.python_pid
+
+# IDEs
 .idea/
+.vscode/
+*.swp
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.eggs/
+*.egg
+.venv/
+venv/
+ENV/
+
+# uv
+.python-version
+
+# Node/Bun
+node_modules/
+.vite/
+dist/
+
+# DuckDB database
 *.duckdb
+*.duckdb.wal
+
+# Logs
+*.log
+data/tracker.log
+data/tracker.error.log
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Legacy files (if any still exist at root)
+render/events_*json
+logs/
+.python_pid
+
+# Keep data directory but ignore contents
+data/*
+!data/.gitkeep
+
+# Bun uses sqlite for some demos
+*.db

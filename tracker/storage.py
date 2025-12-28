@@ -266,7 +266,7 @@ class Storage:
         logical_date: date,
     ) -> None:
         """Insert a note."""
-        self.conn.execute(
+        self._execute(
             """
             INSERT INTO notes (timestamp, content, logical_date)
             VALUES (?, ?, ?)
@@ -277,7 +277,7 @@ class Storage:
     
     def get_notes_for_date(self, logical_date: date) -> list[dict[str, Any]]:
         """Get all notes for a logical date."""
-        result = self.conn.execute(
+        result = self._query(
             """
             SELECT timestamp, content
             FROM notes
@@ -285,7 +285,7 @@ class Storage:
             ORDER BY timestamp
             """,
             [logical_date],
-        ).fetchall()
+        )
         
         return [
             {"timestamp": row[0], "content": row[1]}
@@ -296,7 +296,7 @@ class Storage:
     
     def save_blog(self, logical_date: date, content: str) -> None:
         """Save the daily blog entry."""
-        self.conn.execute(
+        self._execute(
             """
             INSERT INTO daily_blog (logical_date, content)
             VALUES (?, ?)
@@ -307,12 +307,12 @@ class Storage:
     
     def get_blog(self, logical_date: date) -> str | None:
         """Get the daily blog entry."""
-        result = self.conn.execute(
+        result = self._query_one(
             """
             SELECT content FROM daily_blog WHERE logical_date = ?
             """,
             [logical_date],
-        ).fetchone()
+        )
         
         return result[0] if result else None
     
@@ -320,10 +320,10 @@ class Storage:
     
     def get_setting(self, key: str) -> Any:
         """Get a setting value."""
-        result = self.conn.execute(
+        result = self._query_one(
             "SELECT value FROM settings WHERE key = ?",
             [key],
-        ).fetchone()
+        )
         
         if result is None:
             return None
@@ -332,7 +332,7 @@ class Storage:
     
     def set_setting(self, key: str, value: Any) -> None:
         """Set a setting value."""
-        self.conn.execute(
+        self._execute(
             """
             INSERT INTO settings (key, value)
             VALUES (?, ?::JSON)
@@ -345,7 +345,7 @@ class Storage:
     
     def get_available_dates(self) -> list[date]:
         """Get all dates that have data."""
-        result = self.conn.execute(
+        result = self._query(
             """
             SELECT DISTINCT logical_date
             FROM (
@@ -355,14 +355,14 @@ class Storage:
             )
             ORDER BY logical_date DESC
             """
-        ).fetchall()
+        )
         
         return [row[0] for row in result]
     
     def get_daily_summary(self, logical_date: date) -> dict[str, Any]:
         """Get a summary of activity for a specific date."""
         # Get total keystrokes
-        key_result = self.conn.execute(
+        key_result = self._query_one(
             """
             SELECT COALESCE(SUM(key_count), 0) as total_keys,
                    COUNT(*) as key_events
@@ -370,10 +370,10 @@ class Storage:
             WHERE logical_date = ?
             """,
             [logical_date],
-        ).fetchone()
+        )
         
         # Get app usage
-        app_result = self.conn.execute(
+        app_result = self._query(
             """
             SELECT app_name, COUNT(*) as event_count
             FROM window_events
@@ -382,7 +382,7 @@ class Storage:
             ORDER BY event_count DESC
             """,
             [logical_date],
-        ).fetchall()
+        )
         
         return {
             "logical_date": logical_date,
@@ -429,7 +429,7 @@ class Storage:
             LIMIT {limit}
         """
         
-        result = self.conn.execute(query, params).fetchall()
+        result = self._query(query, params)
         
         return [
             {
