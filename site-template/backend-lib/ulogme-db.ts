@@ -279,10 +279,11 @@ export async function getOverview(
       query += " WHERE " + conditions.join(" AND ");
     }
 
+    params.push(String(limit));
     query += `
       GROUP BY w.logical_date
       ORDER BY w.logical_date DESC
-      LIMIT ${limit}
+      LIMIT ?
     `;
 
     const result = await conn.run(query, params);

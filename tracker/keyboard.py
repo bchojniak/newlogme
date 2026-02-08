@@ -5,6 +5,7 @@ Uses NSEvent global monitors to count keystrokes. Privacy-first design:
 only counts keystrokes, never logs actual key values.
 """
 
+import logging
 import threading
 import time
 from datetime import datetime
@@ -15,6 +16,8 @@ from AppKit import NSEvent, NSKeyDownMask
 from .config import Config
 from .storage import Storage
 from .utils import rewind_to_logical_day
+
+logger = logging.getLogger(__name__)
 
 
 class KeystrokeCounter:
@@ -37,37 +40,37 @@ class KeystrokeCounter:
     
     def _handle_key_event(self, event) -> None:
         """Handle a key down event by incrementing the counter."""
-        if event.type() == 10:  # NSKeyDown = 10
+        if event.type() == NSKeyDownMask >> 16:  # NSKeyDown event type
             with self._lock:
                 self._count += 1
-    
+
     def _flush_if_needed(self) -> None:
         """Flush the current count to storage if the window has elapsed."""
         now = time.time()
-        elapsed = now - self._last_flush
-        
-        if elapsed >= self.config.keystroke_window:
-            with self._lock:
-                count = self._count
-                self._count = 0
-                self._last_flush = now
+        with self._lock:
+            elapsed = now - self._last_flush
+            if elapsed < self.config.keystroke_window:
+                return
+            count = self._count
+            self._count = 0
+            self._last_flush = now
             
-            if count > 0:
-                if self.verbose:
-                    print(f"  -> flushing {count} keystrokes", flush=True)
-                timestamp = datetime.now()
-                logical_date = rewind_to_logical_day(
-                    int(timestamp.timestamp()),
-                    self.config.day_boundary_hour
-                )
-                
-                self.storage.insert_key_event(
-                    timestamp=timestamp,
-                    key_count=count,
-                    logical_date=logical_date,
-                )
-            elif self.verbose:
-                print(f"  -> no keystrokes to flush", flush=True)
+        if count > 0:
+            if self.verbose:
+                logger.debug("flushing %d keystrokes", count)
+            timestamp = datetime.now()
+            logical_date = rewind_to_logical_day(
+                int(timestamp.timestamp()),
+                self.config.day_boundary_hour
+            )
+
+            self.storage.insert_key_event(
+                timestamp=timestamp,
+                key_count=count,
+                logical_date=logical_date,
+            )
+        elif self.verbose:
+            logger.debug("no keystrokes to flush")
     
     def poll(self) -> None:
         """Check if we need to flush. Called periodically by the daemon."""

@@ -2,11 +2,14 @@
 Configuration loading and management for ulogme.
 """
 
+import logging
 import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 try:
     import tomllib
@@ -29,21 +32,30 @@ class Config:
     browser_tabs: bool = True
     browser_urls: bool = True
     keystrokes: bool = True
+    sanitize_urls: bool = False
     window_poll_interval: float = 2.0
     keystroke_window: float = 9.0
-    
+
+    # Browsers to track URLs from
+    browsers: list[str] = field(default_factory=lambda: [
+        "Google Chrome", "Safari", "Arc", "Firefox", "Brave",
+    ])
+
     # Day boundary
     day_boundary_hour: int = 7
-    
+
+    # Data retention (0 = keep forever)
+    data_retention_days: int = 0
+
     # Database path
     db_path: Path = field(default_factory=lambda: Path("data/ulogme.duckdb"))
-    
+
     # Category mappings
     category_rules: list[CategoryRule] = field(default_factory=list)
-    
+
     # Hacking categories
     hacking_categories: list[str] = field(default_factory=lambda: ["Coding", "Terminal"])
-    
+
     # Base directory (where config file is located)
     base_dir: Path = field(default_factory=Path.cwd)
     
@@ -115,16 +127,23 @@ def parse_config(data: dict[str, Any], base_dir: Path) -> Config:
             pattern = re.compile(rule["pattern"], re.IGNORECASE)
             rules.append(CategoryRule(pattern=pattern, category=rule["category"]))
         except (KeyError, re.error) as e:
-            print(f"Warning: Invalid category rule: {rule} - {e}")
+            logger.warning("Invalid category rule: %s - %s", rule, e)
     
+    retention = data.get("data_retention", {})
+
     return Config(
         window_titles=tracking.get("window_titles", True),
         browser_tabs=tracking.get("browser_tabs", True),
         browser_urls=tracking.get("browser_urls", True),
         keystrokes=tracking.get("keystrokes", True),
+        sanitize_urls=tracking.get("sanitize_urls", False),
         window_poll_interval=tracking.get("window_poll_interval", 2.0),
         keystroke_window=tracking.get("keystroke_window", 9.0),
+        browsers=tracking.get("browsers", [
+            "Google Chrome", "Safari", "Arc", "Firefox", "Brave",
+        ]),
         day_boundary_hour=day_boundary.get("hour", 7),
+        data_retention_days=retention.get("days", 0),
         db_path=Path(database.get("path", "data/ulogme.duckdb")),
         category_rules=rules,
         hacking_categories=hacking.get("categories", ["Coding", "Terminal"]),

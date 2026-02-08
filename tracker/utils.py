@@ -2,8 +2,9 @@
 Utility functions for ulogme tracker.
 """
 
-from datetime import datetime, date, timedelta
 import time
+from datetime import datetime, date, timedelta, timezone
+from urllib.parse import urlparse, urlunparse
 
 
 def get_unix_timestamp() -> int:
@@ -14,28 +15,40 @@ def get_unix_timestamp() -> int:
 def rewind_to_logical_day(timestamp: int | None = None, boundary_hour: int = 7) -> date:
     """
     Calculate the "logical day" for a given timestamp.
-    
+
     ulogme day breaks occur at the boundary hour (default 7am), so late night
     sessions before that hour count towards the previous day's activity.
-    
+    Uses the system local timezone for consistent day boundaries.
+
     Args:
         timestamp: UNIX timestamp (uses current time if None)
         boundary_hour: Hour at which the new day starts (0-23)
-    
+
     Returns:
         The logical date for the given timestamp
     """
     if timestamp is None:
         timestamp = get_unix_timestamp()
-    
-    dt = datetime.fromtimestamp(timestamp)
-    
+
+    # Use local timezone explicitly for consistent behavior
+    local_tz = datetime.now(timezone.utc).astimezone().tzinfo
+    dt = datetime.fromtimestamp(timestamp, tz=local_tz)
+
     if dt.hour >= boundary_hour:
         # It's between boundary hour and midnight - same calendar day
         return dt.date()
     else:
         # It's between midnight and boundary hour - previous calendar day
         return (dt - timedelta(days=1)).date()
+
+
+def sanitize_url(url: str) -> str:
+    """
+    Sanitize a URL by stripping query parameters and fragments.
+    Keeps only scheme, netloc, and path.
+    """
+    parsed = urlparse(url)
+    return urlunparse((parsed.scheme, parsed.netloc, parsed.path, "", "", ""))
 
 
 def format_duration(seconds: float) -> str:

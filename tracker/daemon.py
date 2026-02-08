@@ -5,6 +5,8 @@ Runs the event loop for macOS, coordinating window tracking and keystroke
 counting.
 """
 
+import fcntl
+import logging
 import os
 import signal
 import sys
@@ -12,6 +14,8 @@ import threading
 import time
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from AppKit import NSApplication, NSApplicationActivationPolicyAccessory
 from Foundation import NSTimer, NSObject
@@ -37,8 +41,7 @@ class DaemonDelegate(NSObject):
     def pollCallback_(self, timer) -> None:
         """Periodic callback for polling window and flushing keystrokes."""
         if self.verbose:
-            from datetime import datetime
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] poll tick", flush=True)
+            logger.debug("poll tick")
         if self.tracker is not None:
             self.tracker.poll()
         if self.counter is not None:
@@ -68,12 +71,14 @@ class Daemon:
         while self._running:
             try:
                 if self.verbose:
-                    from datetime import datetime
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] poll tick", flush=True)
+                    logger.debug("poll tick")
                 self.tracker.poll()
                 self.counter.poll()
+            except (IOError, OSError) as e:
+                logger.error("Poll I/O error: %s", e)
+                time.sleep(5)
             except Exception as e:
-                print(f"Poll error: {e}", flush=True)
+                logger.exception("Unexpected poll error: %s", e)
             time.sleep(self.config.window_poll_interval)
     
     def start(self) -> None:
@@ -96,6 +101,12 @@ class Daemon:
         
         app.setDelegate_(self._delegate)
         
+        # Purge old data if retention is configured
+        if self.config.data_retention_days > 0:
+            purged = self.storage.purge_old_data(self.config.data_retention_days)
+            if purged:
+                logger.info("Purged %d old records (retention: %d days)", purged, self.config.data_retention_days)
+
         # Set up window tracking
         self._observer = setup_window_tracking(self.tracker)
         
@@ -107,11 +118,10 @@ class Daemon:
         self._poll_thread_obj = threading.Thread(target=self._poll_thread, daemon=True)
         self._poll_thread_obj.start()
         
-        print(f"ulogme daemon started (PID: {os.getpid()})", flush=True)
-        print(f"Database: {self.config.absolute_db_path}", flush=True)
-        print(f"Window tracking: {'enabled' if self.config.window_titles else 'disabled'}", flush=True)
-        print(f"Keystroke counting: {'enabled' if self.config.keystrokes else 'disabled'}", flush=True)
-        sys.stdout.flush()
+        logger.info("ulogme daemon started (PID: %d)", os.getpid())
+        logger.info("Database: %s", self.config.absolute_db_path)
+        logger.info("Window tracking: %s", "enabled" if self.config.window_titles else "disabled")
+        logger.info("Keystroke counting: %s", "enabled" if self.config.keystrokes else "disabled")
         
         # Run the event loop - needed for NSWorkspace notifications and key events
         try:
@@ -127,7 +137,7 @@ class Daemon:
             return
         
         self._running = False
-        print("\nStopping ulogme daemon...")
+        logger.info("Stopping ulogme daemon...")
         
         # Clean up keystroke monitoring
         if self.config.keystrokes:
@@ -142,8 +152,8 @@ class Daemon:
         # Stop the event loop
         AppHelper.stopEventLoop()
         
-        print("ulogme daemon stopped")
-    
+        logger.info("ulogme daemon stopped")
+
     def _signal_handler(self, signum, frame) -> None:
         """Handle shutdown signals."""
         self.stop()
@@ -158,10 +168,10 @@ def get_pid_file(config: Config) -> Path:
 def is_running(config: Config) -> tuple[bool, int | None]:
     """Check if the daemon is already running."""
     pid_file = get_pid_file(config)
-    
+
     if not pid_file.exists():
         return False, None
-    
+
     try:
         pid = int(pid_file.read_text().strip())
         # Check if process is still running
@@ -173,17 +183,41 @@ def is_running(config: Config) -> tuple[bool, int | None]:
         return False, None
 
 
-def write_pid_file(config: Config) -> None:
-    """Write the current PID to the PID file."""
+# Module-level lock file descriptor kept alive while daemon runs
+_lock_fd: int | None = None
+
+
+def acquire_pid_lock(config: Config) -> bool:
+    """Acquire an exclusive lock on the PID file. Returns True if acquired."""
+    global _lock_fd
     pid_file = get_pid_file(config)
     pid_file.parent.mkdir(parents=True, exist_ok=True)
-    pid_file.write_text(str(os.getpid()))
+
+    try:
+        _lock_fd = os.open(str(pid_file), os.O_CREAT | os.O_WRONLY)
+        fcntl.flock(_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        os.ftruncate(_lock_fd, 0)
+        os.write(_lock_fd, str(os.getpid()).encode())
+        os.fsync(_lock_fd)
+        return True
+    except (OSError, IOError):
+        if _lock_fd is not None:
+            os.close(_lock_fd)
+            _lock_fd = None
+        return False
 
 
-def remove_pid_file(config: Config) -> None:
-    """Remove the PID file."""
-    pid_file = get_pid_file(config)
-    pid_file.unlink(missing_ok=True)
+def release_pid_lock(config: Config) -> None:
+    """Release the PID file lock and remove the file."""
+    global _lock_fd
+    if _lock_fd is not None:
+        try:
+            fcntl.flock(_lock_fd, fcntl.LOCK_UN)
+            os.close(_lock_fd)
+        except OSError:
+            pass
+        _lock_fd = None
+    get_pid_file(config).unlink(missing_ok=True)
 
 
 def run_daemon(config: Config | None = None, verbose: bool = False) -> None:
@@ -200,17 +234,19 @@ def run_daemon(config: Config | None = None, verbose: bool = False) -> None:
     # Check if already running
     running, pid = is_running(config)
     if running:
-        print(f"ulogme daemon is already running (PID: {pid})")
+        logger.error("ulogme daemon is already running (PID: %s)", pid)
         sys.exit(1)
-    
-    # Write PID file
-    write_pid_file(config)
-    
+
+    # Acquire exclusive PID lock (prevents race condition)
+    if not acquire_pid_lock(config):
+        logger.error("Could not acquire PID lock — another instance may be starting")
+        sys.exit(1)
+
     try:
         daemon = Daemon(config, verbose=verbose)
         daemon.start()
     finally:
-        remove_pid_file(config)
+        release_pid_lock(config)
 
 
 def stop_daemon(config: Config | None = None) -> None:
@@ -226,33 +262,33 @@ def stop_daemon(config: Config | None = None) -> None:
     running, pid = is_running(config)
     
     if not running:
-        print("ulogme daemon is not running")
+        logger.info("ulogme daemon is not running")
         return
-    
+
     if pid is not None:
-        print(f"Stopping ulogme daemon (PID: {pid})...")
+        logger.info("Stopping ulogme daemon (PID: %d)...", pid)
         try:
             os.kill(pid, signal.SIGTERM)
-            
+
             # Wait for process to stop
             for _ in range(10):
                 time.sleep(0.5)
                 try:
                     os.kill(pid, 0)
                 except ProcessLookupError:
-                    print("ulogme daemon stopped")
-                    remove_pid_file(config)
+                    logger.info("ulogme daemon stopped")
+                    release_pid_lock(config)
                     return
-            
+
             # Force kill if still running
             os.kill(pid, signal.SIGKILL)
-            print("ulogme daemon killed")
-            remove_pid_file(config)
+            logger.info("ulogme daemon killed")
+            release_pid_lock(config)
         except ProcessLookupError:
-            print("ulogme daemon was already stopped")
-            remove_pid_file(config)
+            logger.info("ulogme daemon was already stopped")
+            release_pid_lock(config)
         except PermissionError:
-            print(f"Permission denied stopping process {pid}")
+            logger.error("Permission denied stopping process %d", pid)
             sys.exit(1)
 
 
@@ -269,8 +305,8 @@ def check_status(config: Config | None = None) -> None:
     running, pid = is_running(config)
     
     if running:
-        print(f"ulogme daemon is running (PID: {pid})")
-        print(f"Database: {config.absolute_db_path}")
+        logger.info("ulogme daemon is running (PID: %s)", pid)
+        logger.info("Database: %s", config.absolute_db_path)
     else:
-        print("ulogme daemon is not running")
+        logger.info("ulogme daemon is not running")
 

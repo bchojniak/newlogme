@@ -5,6 +5,7 @@ Provides functions to install/uninstall ulogme as a macOS user agent that
 starts automatically on login.
 """
 
+import logging
 import os
 import subprocess
 import sys
@@ -12,6 +13,8 @@ from pathlib import Path
 from typing import Any
 
 from .config import Config, load_config
+
+logger = logging.getLogger(__name__)
 
 
 PLIST_LABEL = "com.ulogme.tracker"
@@ -150,7 +153,7 @@ def install(config: Config | None = None) -> None:
     try:
         plist_content = generate_plist(config)
     except FileNotFoundError as e:
-        print(f"Error: {e}")
+        logger.error("Error: %s", e)
         sys.exit(1)
     
     # Ensure LaunchAgents directory exists
@@ -161,7 +164,7 @@ def install(config: Config | None = None) -> None:
     
     # Unload if already loaded
     if is_loaded():
-        print("Unloading existing service...")
+        logger.info("Unloading existing service...")
         subprocess.run(
             ["launchctl", "unload", str(plist_path)],
             capture_output=True,
@@ -169,22 +172,22 @@ def install(config: Config | None = None) -> None:
     
     # Write plist file
     plist_path.write_text(plist_content)
-    print(f"Wrote plist to: {plist_path}")
-    
+    logger.info("Wrote plist to: %s", plist_path)
+
     # Load the service
     result = subprocess.run(
         ["launchctl", "load", str(plist_path)],
         capture_output=True,
         text=True,
     )
-    
+
     if result.returncode != 0:
-        print(f"Error loading service: {result.stderr}")
+        logger.error("Error loading service: %s", result.stderr)
         sys.exit(1)
-    
-    print(f"ulogme installed and started as launchd service")
-    print(f"The tracker will start automatically on login")
-    print(f"Logs: {config.absolute_db_path.parent / 'tracker.log'}")
+
+    logger.info("ulogme installed and started as launchd service")
+    logger.info("The tracker will start automatically on login")
+    logger.info("Logs: %s", config.absolute_db_path.parent / "tracker.log")
 
 
 def uninstall() -> None:
@@ -198,24 +201,24 @@ def uninstall() -> None:
     plist_path = get_plist_path()
     
     if not plist_path.exists():
-        print("ulogme is not installed as a launchd service")
+        logger.info("ulogme is not installed as a launchd service")
         return
-    
+
     # Unload the service
     if is_loaded():
-        print("Unloading service...")
+        logger.info("Unloading service...")
         result = subprocess.run(
             ["launchctl", "unload", str(plist_path)],
             capture_output=True,
             text=True,
         )
-        
+
         if result.returncode != 0:
-            print(f"Warning: Error unloading service: {result.stderr}")
-    
+            logger.warning("Error unloading service: %s", result.stderr)
+
     # Remove plist file
     plist_path.unlink()
-    print("ulogme launchd service uninstalled")
+    logger.info("ulogme launchd service uninstalled")
 
 
 def status() -> None:
@@ -223,15 +226,15 @@ def status() -> None:
     plist_path = get_plist_path()
     
     if not plist_path.exists():
-        print("ulogme is not installed as a launchd service")
-        print(f"Run 'uv run python -m tracker install' to install")
+        logger.info("ulogme is not installed as a launchd service")
+        logger.info("Run 'uv run python -m tracker install' to install")
         return
-    
-    print(f"Plist: {plist_path}")
-    
+
+    logger.info("Plist: %s", plist_path)
+
     if is_loaded():
-        print("Status: loaded and running")
-        
+        logger.info("Status: loaded and running")
+
         # Get more info
         result = subprocess.run(
             ["launchctl", "list", PLIST_LABEL],
@@ -241,8 +244,8 @@ def status() -> None:
         if result.returncode == 0:
             for line in result.stdout.strip().split("\n"):
                 if "PID" in line or PLIST_LABEL in line:
-                    print(f"  {line}")
+                    logger.info("  %s", line)
     else:
-        print("Status: installed but not loaded")
-        print(f"Run 'launchctl load {plist_path}' to start")
+        logger.info("Status: installed but not loaded")
+        logger.info("Run 'launchctl load %s' to start", plist_path)
 

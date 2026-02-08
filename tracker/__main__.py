@@ -10,11 +10,22 @@ Usage:
     uv run python -m tracker uninstall   # Remove launchd service
 """
 
+import logging
 import sys
 
 from .config import load_config
 from .daemon import run_daemon, stop_daemon, check_status
 from .launchd import install, uninstall, status as launchd_status
+
+
+def setup_logging(verbose: bool = False) -> None:
+    """Configure logging for the tracker."""
+    level = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%H:%M:%S",
+    )
 
 
 def print_usage() -> None:
@@ -60,7 +71,9 @@ def main() -> None:
     
     command = sys.argv[1].lower()
     verbose = "--verbose" in sys.argv or "-v" in sys.argv
-    
+
+    setup_logging(verbose)
+
     # Load config once
     config = load_config()
     

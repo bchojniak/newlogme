@@ -3,13 +3,16 @@ DuckDB storage layer for ulogme.
 """
 
 import json
-from datetime import date, datetime
+import logging
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import duckdb
 
 from .config import Config
+
+logger = logging.getLogger(__name__)
 
 
 # Schema version for migrations
@@ -394,6 +397,27 @@ class Storage:
             ],
         }
     
+    def purge_old_data(self, retention_days: int) -> int:
+        """Delete data older than retention_days. Returns number of rows deleted."""
+        if retention_days <= 0:
+            return 0
+
+        cutoff = date.today() - timedelta(days=retention_days)
+        total = 0
+
+        for table in ("window_events", "key_events", "notes", "daily_blog"):
+            result = self._query(
+                f"SELECT COUNT(*) FROM {table} WHERE logical_date < ?",
+                [cutoff],
+            )
+            count = result[0][0] if result else 0
+            if count > 0:
+                self._execute(f"DELETE FROM {table} WHERE logical_date < ?", [cutoff])
+                total += count
+                logger.info("Purged %d rows from %s (older than %s)", count, table, cutoff)
+
+        return total
+
     def get_overview(
         self,
         from_date: date | None = None,
@@ -423,12 +447,13 @@ class Storage:
                 params.append(to_date)
             query += " WHERE " + " AND ".join(conditions)
         
-        query += f"""
+        params.append(limit)
+        query += """
             GROUP BY logical_date
             ORDER BY logical_date DESC
-            LIMIT {limit}
+            LIMIT ?
         """
-        
+
         result = self._query(query, params)
         
         return [

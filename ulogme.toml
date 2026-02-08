@@ -8,6 +8,12 @@ browser_tabs = true      # Track active tab titles
 browser_urls = true      # Track full URLs (useful for categorization)
 keystrokes = true
 
+# Strip query params and fragments from URLs for privacy (tokens, passwords in URLs)
+sanitize_urls = true
+
+# Browsers to track URLs from (add "Chrome Canary", "Chromium", etc. if needed)
+browsers = ["Google Chrome", "Safari", "Arc", "Firefox", "Brave"]
+
 # Polling interval in seconds for active window checks
 window_poll_interval = 2
 
@@ -22,6 +28,10 @@ hour = 7
 [database]
 # Path to the DuckDB database file (relative to this config file's directory)
 path = "data/ulogme.duckdb"
+
+[data_retention]
+# Auto-delete data older than N days (0 = keep forever)
+days = 0
 
 [category_mappings]
 # Regex patterns to categorize windows into groups

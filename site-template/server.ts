@@ -4,6 +4,7 @@ import { createServer as createViteServer } from "vite";
 import config from "./zosite.json";
 import { Hono } from "hono";
 import { getRecentRegistrations, createRegistration } from "./backend-lib/db";
+import { z } from "zod";
 import {
   getAvailableDates,
   getDayData,
@@ -14,6 +15,21 @@ import {
   getSettings,
   updateSetting,
 } from "./backend-lib/ulogme-db";
+
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const dateSchema = z.string().regex(DATE_REGEX, "Invalid date format (expected YYYY-MM-DD)");
+const noteSchema = z.object({
+  timestamp: z.string().min(1),
+  content: z.string().min(1).max(10_000),
+  logical_date: z.string().regex(DATE_REGEX),
+});
+const blogSchema = z.object({
+  content: z.string().max(100_000),
+});
+const settingsSchema = z.record(
+  z.string().max(100),
+  z.unknown()
+);
 
 type Mode = "development" | "production";
 const app = new Hono();
@@ -68,8 +84,11 @@ app.get("/api/ulogme/dates", async (c) => {
  */
 app.get("/api/ulogme/day/:logicalDate", async (c) => {
   try {
-    const logicalDate = c.req.param("logicalDate");
-    const data = await getDayData(logicalDate);
+    const parsed = dateSchema.safeParse(c.req.param("logicalDate"));
+    if (!parsed.success) {
+      return c.json({ error: "Invalid date format" }, 400);
+    }
+    const data = await getDayData(parsed.data);
     return c.json(data);
   } catch (error) {
     console.error("Error fetching day data:", error);
@@ -83,8 +102,11 @@ app.get("/api/ulogme/day/:logicalDate", async (c) => {
  */
 app.get("/api/ulogme/day/:logicalDate/apps", async (c) => {
   try {
-    const logicalDate = c.req.param("logicalDate");
-    const apps = await getAppUsageForDate(logicalDate);
+    const parsed = dateSchema.safeParse(c.req.param("logicalDate"));
+    if (!parsed.success) {
+      return c.json({ error: "Invalid date format" }, 400);
+    }
+    const apps = await getAppUsageForDate(parsed.data);
     return c.json({ apps });
   } catch (error) {
     console.error("Error fetching app usage:", error);
@@ -100,7 +122,9 @@ app.get("/api/ulogme/overview", async (c) => {
   try {
     const from = c.req.query("from");
     const to = c.req.query("to");
-    const limit = parseInt(c.req.query("limit") || "30", 10);
+    if (from && !DATE_REGEX.test(from)) return c.json({ error: "Invalid 'from' date" }, 400);
+    if (to && !DATE_REGEX.test(to)) return c.json({ error: "Invalid 'to' date" }, 400);
+    const limit = Math.min(Math.max(parseInt(c.req.query("limit") || "30", 10) || 30, 1), 365);
 
     const days = await getOverview(from, to, limit);
     return c.json({ days });
@@ -117,16 +141,12 @@ app.get("/api/ulogme/overview", async (c) => {
 app.post("/api/ulogme/note", async (c) => {
   try {
     const body = await c.req.json();
-    const { timestamp, content, logical_date } = body;
-
-    if (!timestamp || !content || !logical_date) {
-      return c.json(
-        { error: "timestamp, content, and logical_date are required" },
-        400
-      );
+    const parsed = noteSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ error: parsed.error.issues[0]?.message || "Invalid input" }, 400);
     }
 
-    await addNote(timestamp, content, logical_date);
+    await addNote(parsed.data.timestamp, parsed.data.content, parsed.data.logical_date);
     return c.json({ success: true });
   } catch (error) {
     console.error("Error adding note:", error);
@@ -140,15 +160,16 @@ app.post("/api/ulogme/note", async (c) => {
  */
 app.put("/api/ulogme/blog/:logicalDate", async (c) => {
   try {
-    const logicalDate = c.req.param("logicalDate");
-    const body = await c.req.json();
-    const { content } = body;
+    const dateParsed = dateSchema.safeParse(c.req.param("logicalDate"));
+    if (!dateParsed.success) return c.json({ error: "Invalid date format" }, 400);
 
-    if (content === undefined) {
-      return c.json({ error: "content is required" }, 400);
+    const body = await c.req.json();
+    const parsed = blogSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ error: parsed.error.issues[0]?.message || "Invalid input" }, 400);
     }
 
-    await saveBlog(logicalDate, content);
+    await saveBlog(dateParsed.data, parsed.data.content);
     return c.json({ success: true });
   } catch (error) {
     console.error("Error saving blog:", error);
@@ -177,8 +198,12 @@ app.get("/api/ulogme/settings", async (c) => {
 app.put("/api/ulogme/settings", async (c) => {
   try {
     const body = await c.req.json();
+    const parsed = settingsSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ error: "Invalid settings format" }, 400);
+    }
 
-    for (const [key, value] of Object.entries(body)) {
+    for (const [key, value] of Object.entries(parsed.data)) {
       await updateSetting(key, value);
     }
 
@@ -209,7 +234,7 @@ const port =
     ? (config.publish?.published_port ?? config.local_port)
     : config.local_port;
 
-export default { fetch: app.fetch, port, idleTimeout: 255 };
+export default { fetch: app.fetch, port, hostname: "127.0.0.1", idleTimeout: 255 };
 
 /**
  * Configure routing for production builds.

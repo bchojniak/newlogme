@@ -101,7 +101,7 @@ export function ActivityTimeline({ events }: Props) {
         topApp,
         fill: topApp ? getAppColor(topApp) : "#1f2937",
       };
-    }).filter(d => d.events > 0 || d.hour >= 7 && d.hour <= 23);
+    }).filter(d => d.events > 0 || (d.hour >= 7 && d.hour <= 23));
   }, [events]);
 
   const chartConfig = {

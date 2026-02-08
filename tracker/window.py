@@ -5,8 +5,11 @@ Uses NSWorkspace notifications to track application switches and
 CGWindowListCopyWindowInfo for window titles.
 """
 
+import logging
 from datetime import datetime
 from typing import Callable
+
+logger = logging.getLogger(__name__)
 
 from AppKit import NSWorkspace
 from Foundation import NSAppleScript, NSObject
@@ -18,7 +21,7 @@ from Quartz import (
 
 from .config import Config
 from .storage import Storage
-from .utils import rewind_to_logical_day, remove_non_ascii
+from .utils import rewind_to_logical_day, remove_non_ascii, sanitize_url
 
 
 class WindowTracker:
@@ -84,31 +87,34 @@ class WindowTracker:
     def get_browser_url(self, app_name: str) -> str | None:
         """
         Get the current URL from a browser application.
-        
+
         Only works if the browser is running and has at least one window.
         """
         if not self.config.browser_urls:
             return None
-        
+
         script: NSAppleScript | None = None
-        
+
         if "Chrome" in app_name:
             script = self._get_chrome_url_script()
         elif "Safari" in app_name:
             script = self._get_safari_url_script()
         elif "Arc" in app_name:
             script = self._get_arc_url_script()
-        
+
         if script is None:
             return None
-        
+
         try:
             result, error = script.executeAndReturnError_(None)
             if result is not None:
-                return str(result.stringValue())
+                url = str(result.stringValue())
+                if self.config.sanitize_urls:
+                    url = sanitize_url(url)
+                return url
         except Exception:
             pass
-        
+
         return None
     
     def get_current_window_name(self) -> str | None:
@@ -166,7 +172,7 @@ class WindowTracker:
         
         # Get browser URL if applicable
         browser_url: str | None = None
-        if self.current_app in ("Google Chrome", "Safari", "Arc", "Firefox", "Brave"):
+        if self.current_app in self.config.browsers:
             browser_url = self.get_browser_url(self.current_app)
             # For browsers, use URL as window title if enabled
             if self.config.browser_tabs and browser_url:
@@ -192,7 +198,7 @@ class WindowTracker:
         )
         
         if self.verbose:
-            print(f"  -> window: {name_to_log[:60]}...", flush=True)
+            logger.debug("window: %s", name_to_log[:60])
         
         self.storage.insert_window_event(
             timestamp=now,
