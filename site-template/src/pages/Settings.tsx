@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Card,
@@ -35,7 +35,7 @@ export default function Settings() {
   const [hackingCategories, setHackingCategories] = useState<string>("");
 
   useEffect(() => {
-    fetch("/api/ulogme/settings")
+    fetch("/api/tracker/settings")
       .then((r) => r.json())
       .then((data) => {
         setSettings(data);
@@ -79,7 +79,7 @@ export default function Settings() {
         .map((s) => s.trim())
         .filter(Boolean);
 
-      await fetch("/api/ulogme/settings", {
+      await fetch("/api/tracker/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -101,31 +101,31 @@ export default function Settings() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-slate-100 p-6">
+      <div className="min-h-screen bg-white text-stone-900 p-6">
         <div className="max-w-3xl mx-auto">
-          <p className="text-slate-400">Loading settings...</p>
+          <p className="text-stone-400">Loading settings…</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-slate-100">
+    <div className="min-h-screen bg-white text-stone-900">
       {/* Header */}
-      <header className="border-b border-slate-800/50 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-50">
+      <header className="border-b border-stone-200 bg-white sticky top-0 z-50">
         <div className="max-w-3xl mx-auto px-6 py-4">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
               size="icon"
               asChild
-              className="text-slate-400 hover:text-slate-100"
+              className="text-stone-400 hover:text-stone-900"
             >
-              <Link to="/overview">
+              <Link to="/overview" aria-label="Back to overview">
                 <ArrowLeft className="h-5 w-5" />
               </Link>
             </Button>
-            <h1 className="text-xl font-bold text-slate-100">Settings</h1>
+            <h1 className="text-xl font-bold text-stone-900">Settings</h1>
           </div>
         </div>
       </header>
@@ -134,10 +134,11 @@ export default function Settings() {
       <main className="max-w-3xl mx-auto px-6 py-8 space-y-8">
         {message && (
           <div
+            role="alert"
             className={`p-4 rounded-lg ${
               message.includes("success")
-                ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                : "bg-red-500/10 text-red-400 border border-red-500/20"
+                ? "bg-green-50 text-green-700 border border-green-200"
+                : "bg-red-50 text-red-700 border border-red-200"
             }`}
           >
             {message}
@@ -145,10 +146,10 @@ export default function Settings() {
         )}
 
         {/* Category Mappings */}
-        <Card className="bg-slate-900/50 border-slate-800/50">
+        <Card className="border-stone-200">
           <CardHeader>
-            <CardTitle className="text-slate-100">Category Mappings</CardTitle>
-            <CardDescription className="text-slate-400">
+            <CardTitle className="text-stone-900">Category Mappings</CardTitle>
+            <CardDescription>
               Define regex patterns to categorize window titles. First match
               wins, so order matters.
             </CardDescription>
@@ -157,32 +158,33 @@ export default function Settings() {
             {mappings.map((mapping, index) => (
               <div key={index} className="flex gap-3 items-start">
                 <div className="flex-1 space-y-2">
-                  <Label className="text-slate-400 text-xs">Pattern (regex)</Label>
+                  <Label className="text-stone-500 text-xs">Pattern (regex)</Label>
                   <Input
                     value={mapping.pattern}
                     onChange={(e) =>
                       handleMappingChange(index, "pattern", e.target.value)
                     }
                     placeholder="Google Chrome|Safari"
-                    className="bg-slate-800/50 border-slate-700 text-slate-100"
+                    className="border-stone-200 text-stone-900"
                   />
                 </div>
                 <div className="flex-1 space-y-2">
-                  <Label className="text-slate-400 text-xs">Category</Label>
+                  <Label className="text-stone-500 text-xs">Category</Label>
                   <Input
                     value={mapping.category}
                     onChange={(e) =>
                       handleMappingChange(index, "category", e.target.value)
                     }
                     placeholder="Browser"
-                    className="bg-slate-800/50 border-slate-700 text-slate-100"
+                    className="border-stone-200 text-stone-900"
                   />
                 </div>
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => handleRemoveMapping(index)}
-                  className="mt-7 text-slate-500 hover:text-red-400"
+                  aria-label="Remove mapping"
+                  className="mt-7 text-stone-400 hover:text-red-500"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -192,7 +194,7 @@ export default function Settings() {
             <Button
               variant="outline"
               onClick={handleAddMapping}
-              className="w-full border-dashed border-slate-700 text-slate-400 hover:text-slate-100 hover:border-slate-600"
+              className="w-full border-dashed border-stone-300 text-stone-500 hover:text-stone-900 hover:border-stone-400"
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Mapping
@@ -201,10 +203,10 @@ export default function Settings() {
         </Card>
 
         {/* Hacking Categories */}
-        <Card className="bg-slate-900/50 border-slate-800/50">
+        <Card className="border-stone-200">
           <CardHeader>
-            <CardTitle className="text-slate-100">Focus Categories</CardTitle>
-            <CardDescription className="text-slate-400">
+            <CardTitle className="text-stone-900">Focus Categories</CardTitle>
+            <CardDescription>
               Categories considered "focused work" for the activity heatmap.
               Comma-separated.
             </CardDescription>
@@ -214,39 +216,39 @@ export default function Settings() {
               value={hackingCategories}
               onChange={(e) => setHackingCategories(e.target.value)}
               placeholder="Coding, Terminal, Editor"
-              className="bg-slate-800/50 border-slate-700 text-slate-100"
+              className="border-stone-200 text-stone-900"
             />
           </CardContent>
         </Card>
 
         {/* Tracker Info */}
-        <Card className="bg-slate-900/50 border-slate-800/50">
+        <Card className="border-stone-200">
           <CardHeader>
-            <CardTitle className="text-slate-100">Tracker Information</CardTitle>
-            <CardDescription className="text-slate-400">
-              Status and configuration of the ulogme tracker daemon
+            <CardTitle className="text-stone-900">Tracker Information</CardTitle>
+            <CardDescription>
+              Status and configuration of the Time Tracker daemon
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-slate-800/50 rounded-lg p-4 font-mono text-sm">
-              <p className="text-slate-400">
-                <span className="text-cyan-400">Database:</span>{" "}
-                <span className="text-slate-300">data/ulogme.duckdb</span>
+            <div className="bg-stone-50 rounded-lg p-4 font-mono text-sm">
+              <p className="text-stone-500">
+                <span className="text-[#D4735E]">Database:</span>{" "}
+                <span className="text-stone-700">data/ulogme.duckdb</span>
               </p>
-              <p className="text-slate-400 mt-2">
-                <span className="text-cyan-400">Day Boundary:</span>{" "}
-                <span className="text-slate-300">7:00 AM</span>
+              <p className="text-stone-500 mt-2">
+                <span className="text-[#D4735E]">Day Boundary:</span>{" "}
+                <span className="text-stone-700">7:00 AM</span>
               </p>
             </div>
 
-            <div className="text-sm text-slate-500 space-y-1">
+            <div className="text-sm text-stone-500 space-y-1">
               <p>
                 To start the tracker:{" "}
-                <code className="text-cyan-400">uv run python -m tracker start</code>
+                <code className="text-[#D4735E]">uv run python -m tracker start</code>
               </p>
               <p>
                 To install as service:{" "}
-                <code className="text-cyan-400">uv run python -m tracker install</code>
+                <code className="text-[#D4735E]">uv run python -m tracker install</code>
               </p>
             </div>
           </CardContent>
@@ -257,7 +259,7 @@ export default function Settings() {
           <Button
             onClick={handleSave}
             disabled={saving}
-            className="bg-cyan-600 hover:bg-cyan-500 text-white"
+            className="bg-[#D4735E] hover:bg-[#c0654f] text-white"
           >
             <Save className="h-4 w-4 mr-2" />
             {saving ? "Saving..." : "Save Settings"}
@@ -267,4 +269,3 @@ export default function Settings() {
     </div>
   );
 }
-

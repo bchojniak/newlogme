@@ -3,7 +3,6 @@ Configuration loading and management for ulogme.
 """
 
 import logging
-import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path

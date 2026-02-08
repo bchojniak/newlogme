@@ -36,45 +36,19 @@ days = 0
 [category_mappings]
 # Regex patterns to categorize windows into groups
 # Order matters - first match wins
-# Format: pattern = "category"
+# Matching is done on "AppName :: WindowTitle" (case insensitive)
 
+# Work: anything with "comp" in the name, plus specific work apps
 [[category_mappings.rules]]
-pattern = "Google Chrome|Firefox|Safari|Arc|Brave"
-category = "Browser"
+pattern = "comp|slack|notion|linear|codex|calendar|gmail|google meet|meet\\.google|finder|terminal|ghostty|iterm|warp|vs.?code|visual studio|cursor|metabase|\\bcode\\b"
+category = "Work"
 
+# Everything else = Personal
 [[category_mappings.rules]]
-pattern = "VS Code|Visual Studio Code|Cursor|Zed|Sublime|Atom|IntelliJ|PyCharm|WebStorm"
-category = "Coding"
-
-[[category_mappings.rules]]
-pattern = "Terminal|iTerm|Warp|Alacritty|kitty"
-category = "Terminal"
-
-[[category_mappings.rules]]
-pattern = "Slack|Discord|Messages|Telegram|WhatsApp"
-category = "Chat"
-
-[[category_mappings.rules]]
-pattern = "Mail|Outlook|Spark|Airmail"
-category = "Email"
-
-[[category_mappings.rules]]
-pattern = "Figma|Sketch|Adobe|Affinity"
-category = "Design"
-
-[[category_mappings.rules]]
-pattern = "Zoom|Meet|Teams|FaceTime"
-category = "Meetings"
-
-[[category_mappings.rules]]
-pattern = "Notion|Obsidian|Bear|Notes|Roam"
-category = "Notes"
-
-[[category_mappings.rules]]
-pattern = "Spotify|Music|Podcasts"
-category = "Music"
+pattern = ".*"
+category = "Personal"
 
 [hacking]
 # Categories considered "focused work" for hacking streak visualization
-categories = ["Coding", "Terminal"]
+categories = ["Work"]
 

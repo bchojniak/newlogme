@@ -1,11 +1,6 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
-
-interface DailySummary {
-  logical_date: string;
-  total_keys: number;
-  unique_apps: number;
-}
+import { type DailySummary } from "./shared";
 
 interface Props {
   days: DailySummary[];
@@ -21,13 +16,12 @@ function formatDate(dateStr: string): string {
 }
 
 function getIntensityColor(intensity: number): string {
-  // Intensity from 0 to 1
-  if (intensity === 0) return "bg-slate-800/50";
-  if (intensity < 0.2) return "bg-cyan-950/80";
-  if (intensity < 0.4) return "bg-cyan-900/80";
-  if (intensity < 0.6) return "bg-cyan-700/80";
-  if (intensity < 0.8) return "bg-cyan-500/80";
-  return "bg-cyan-400";
+  if (intensity === 0) return "bg-stone-100";
+  if (intensity < 0.2) return "bg-[#D4735E]/15";
+  if (intensity < 0.4) return "bg-[#D4735E]/30";
+  if (intensity < 0.6) return "bg-[#D4735E]/50";
+  if (intensity < 0.8) return "bg-[#D4735E]/70";
+  return "bg-[#D4735E]";
 }
 
 export function HackingStreak({ days }: Props) {
@@ -48,7 +42,7 @@ export function HackingStreak({ days }: Props) {
 
   if (days.length === 0) {
     return (
-      <div className="h-[60px] flex items-center justify-center text-slate-500">
+      <div className="h-[60px] flex items-center justify-center text-stone-400">
         No data available
       </div>
     );
@@ -67,15 +61,15 @@ export function HackingStreak({ days }: Props) {
             <div
               className={`w-8 h-8 rounded-md ${getIntensityColor(
                 cell.intensity
-              )} hover:ring-2 hover:ring-cyan-400/50 transition-all cursor-pointer`}
+              )} hover:ring-2 hover:ring-[#D4735E]/50 transition-shadow cursor-pointer`}
             />
             {/* Tooltip */}
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-              <div className="bg-slate-800 border border-slate-700 rounded-lg p-2 shadow-xl whitespace-nowrap">
-                <p className="text-slate-100 text-xs font-medium">
+              <div className="bg-white border border-stone-200 rounded-lg p-2 shadow-lg whitespace-nowrap">
+                <p className="text-stone-900 text-xs font-medium">
                   {formatDate(cell.date)}
                 </p>
-                <p className="text-cyan-400 text-xs">
+                <p className="text-[#D4735E] text-xs">
                   {cell.keys.toLocaleString()} keys
                 </p>
               </div>
@@ -85,19 +79,18 @@ export function HackingStreak({ days }: Props) {
       </div>
 
       {/* Legend */}
-      <div className="flex items-center justify-end gap-2 text-xs text-slate-500">
+      <div className="flex items-center justify-end gap-2 text-xs text-stone-400">
         <span>Less</span>
         <div className="flex gap-1">
-          <div className="w-3 h-3 rounded-sm bg-slate-800/50" />
-          <div className="w-3 h-3 rounded-sm bg-cyan-950/80" />
-          <div className="w-3 h-3 rounded-sm bg-cyan-900/80" />
-          <div className="w-3 h-3 rounded-sm bg-cyan-700/80" />
-          <div className="w-3 h-3 rounded-sm bg-cyan-500/80" />
-          <div className="w-3 h-3 rounded-sm bg-cyan-400" />
+          <div className="w-3 h-3 rounded-sm bg-stone-100" />
+          <div className="w-3 h-3 rounded-sm bg-[#D4735E]/15" />
+          <div className="w-3 h-3 rounded-sm bg-[#D4735E]/30" />
+          <div className="w-3 h-3 rounded-sm bg-[#D4735E]/50" />
+          <div className="w-3 h-3 rounded-sm bg-[#D4735E]/70" />
+          <div className="w-3 h-3 rounded-sm bg-[#D4735E]" />
         </div>
         <span>More</span>
       </div>
     </div>
   );
 }
-

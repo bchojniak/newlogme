@@ -30,16 +30,13 @@ def rewind_to_logical_day(timestamp: int | None = None, boundary_hour: int = 7) 
     if timestamp is None:
         timestamp = get_unix_timestamp()
 
-    # Use local timezone explicitly for consistent behavior
     local_tz = datetime.now(timezone.utc).astimezone().tzinfo
     dt = datetime.fromtimestamp(timestamp, tz=local_tz)
 
-    if dt.hour >= boundary_hour:
-        # It's between boundary hour and midnight - same calendar day
-        return dt.date()
-    else:
-        # It's between midnight and boundary hour - previous calendar day
+    # Before the boundary hour, activity counts towards the previous calendar day
+    if dt.hour < boundary_hour:
         return (dt - timedelta(days=1)).date()
+    return dt.date()
 
 
 def sanitize_url(url: str) -> str:

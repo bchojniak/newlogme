@@ -1,26 +1,17 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import {
   Bar,
   BarChart,
   XAxis,
   YAxis,
   Tooltip,
-  ResponsiveContainer,
   Cell,
 } from "recharts";
 import {
   ChartConfig,
   ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
 } from "@/components/ui/chart";
-
-interface WindowEvent {
-  timestamp: string;
-  app_name: string;
-  window_title: string | null;
-  browser_url: string | null;
-}
+import { type WindowEvent } from "./shared";
 
 interface Props {
   events: WindowEvent[];
@@ -43,7 +34,7 @@ const APP_COLORS: Record<string, string> = {
   Discord: "var(--chart-4)",
   Messages: "var(--chart-4)",
   Finder: "var(--chart-5)",
-  __LOCKEDSCREEN: "#374151",
+  __LOCKEDSCREEN: "#d6d3d1",
 };
 
 function getAppColor(appName: string): string {
@@ -73,7 +64,7 @@ export function ActivityTimeline({ events }: Props) {
     }
 
     // Count events per hour per app
-    events.forEach((event, index) => {
+    events.forEach((event) => {
       const date = new Date(event.timestamp);
       const hour = date.getHours();
 
@@ -84,13 +75,15 @@ export function ActivityTimeline({ events }: Props) {
       }
     });
 
-    // Convert to chart data format, ordered by logical day (7am start)
-    const orderedHours = [...Array.from({ length: 17 }, (_, i) => i + 7).filter(h => h <= 23),
-                         ...Array.from({ length: 7 }, (_, i) => i)];
+    // Hours ordered by logical day (7am-11pm, then 12am-6am)
+    const orderedHours = [
+      ...Array.from({ length: 17 }, (_, i) => i + 7),
+      ...Array.from({ length: 7 }, (_, i) => i),
+    ];
 
     return orderedHours.map((hour) => {
       const data = hourlyData[hour];
-      const topApp = data.apps.size > 0 
+      const topApp = data.apps.size > 0
         ? [...data.apps.entries()].sort((a, b) => b[1] - a[1])[0][0]
         : null;
 
@@ -99,7 +92,7 @@ export function ActivityTimeline({ events }: Props) {
         hourLabel: formatHour(hour),
         events: data.total,
         topApp,
-        fill: topApp ? getAppColor(topApp) : "#1f2937",
+        fill: topApp ? getAppColor(topApp) : "#e7e5e4",
       };
     }).filter(d => d.events > 0 || (d.hour >= 7 && d.hour <= 23));
   }, [events]);
@@ -113,7 +106,7 @@ export function ActivityTimeline({ events }: Props) {
 
   if (events.length === 0) {
     return (
-      <div className="h-[200px] flex items-center justify-center text-slate-500">
+      <div className="h-[200px] flex items-center justify-center text-stone-400">
         No activity data for this day
       </div>
     );
@@ -126,7 +119,7 @@ export function ActivityTimeline({ events }: Props) {
           dataKey="hourLabel"
           tickLine={false}
           axisLine={false}
-          tick={{ fill: "#64748b", fontSize: 12 }}
+          tick={{ fill: "#a8a29e", fontSize: 12 }}
           interval={2}
         />
         <YAxis hide />
@@ -135,11 +128,11 @@ export function ActivityTimeline({ events }: Props) {
             if (!active || !payload?.length) return null;
             const data = payload[0].payload;
             return (
-              <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-xl">
-                <p className="text-slate-100 font-medium">{data.hourLabel}</p>
-                <p className="text-slate-400 text-sm">{data.events} events</p>
+              <div className="bg-white border border-stone-200 rounded-lg p-3 shadow-lg">
+                <p className="text-stone-900 font-medium">{data.hourLabel}</p>
+                <p className="text-stone-500 text-sm">{data.events} events</p>
                 {data.topApp && (
-                  <p className="text-cyan-400 text-sm mt-1">Top: {data.topApp}</p>
+                  <p className="text-[#D4735E] text-sm mt-1">Top: {data.topApp}</p>
                 )}
               </div>
             );
@@ -154,4 +147,3 @@ export function ActivityTimeline({ events }: Props) {
     </ChartContainer>
   );
 }
-

@@ -1,7 +1,7 @@
 /**
- * DuckDB interface for ulogme data.
+ * DuckDB interface for Time Tracker data.
  *
- * Provides functions to query the ulogme database created by the Python tracker.
+ * Provides functions to query the tracker database created by the Python tracker.
  */
 
 import { DuckDBInstance, DuckDBConnection } from "@duckdb/node-api";
@@ -12,49 +12,30 @@ import { existsSync } from "fs";
 const DB_PATH = join(dirname(dirname(import.meta.dir)), "data", "ulogme.duckdb");
 
 /**
- * Helper to run a query with automatic connection management.
- * Creates a fresh read-only connection, runs the query, and closes everything.
+ * Run a callback with an auto-managed DuckDB connection.
+ * Opens a fresh connection, executes the callback, then closes everything.
  */
-export async function withConnection<T>(
-  fn: (conn: DuckDBConnection) => Promise<T>
+async function withDB<T>(
+  fn: (conn: DuckDBConnection) => Promise<T>,
+  options: { readOnly: boolean } = { readOnly: true }
 ): Promise<T> {
   if (!existsSync(DB_PATH)) {
     throw new Error(`Database not found: ${DB_PATH}. Run the tracker first to create it.`);
   }
-  
-  const instance = await DuckDBInstance.create(DB_PATH, {
-    access_mode: "READ_ONLY",
-  });
+
+  const instanceOptions = options.readOnly ? { access_mode: "READ_ONLY" as const } : {};
+  const instance = await DuckDBInstance.create(DB_PATH, instanceOptions);
   const conn = await instance.connect();
-  
+
   try {
     return await fn(conn);
   } finally {
-    // Explicitly close connection and instance to release locks
     conn.closeSync();
     instance.closeSync();
   }
 }
 
-/**
- * Get a fresh DuckDB connection.
- * @deprecated Use withConnection() instead to ensure proper cleanup
- */
-export async function getConnection(): Promise<DuckDBConnection> {
-  const instance = await DuckDBInstance.create(DB_PATH, {
-    access_mode: "READ_ONLY",
-  });
-  return await instance.connect();
-}
-
-/**
- * Close a database connection.
- */
-export async function closeConnection(conn: DuckDBConnection): Promise<void> {
-  conn.closeSync();
-}
-
-// Type definitions for ulogme data
+// Type definitions for tracker data
 
 export interface WindowEvent {
   timestamp: string;
@@ -93,13 +74,25 @@ export interface DailySummary {
   category_durations?: Record<string, number>;
 }
 
+// Helpers
+
+/**
+ * Convert a DuckDB date value to a YYYY-MM-DD string.
+ */
+function toDateString(value: unknown): string {
+  if (value instanceof Date) {
+    return value.toISOString().split("T")[0];
+  }
+  return String(value);
+}
+
 // Query functions
 
 /**
  * Get all available dates that have data.
  */
 export async function getAvailableDates(): Promise<DateInfo[]> {
-  return withConnection(async (conn) => {
+  return withDB(async (conn) => {
     const result = await conn.run(`
       SELECT DISTINCT logical_date
       FROM (
@@ -111,26 +104,13 @@ export async function getAvailableDates(): Promise<DateInfo[]> {
     `);
 
     const rows = await result.getRows();
-    const dates: DateInfo[] = [];
 
-    for (const row of rows) {
-      const dateValue = row[0];
-      if (dateValue) {
-        const dateStr =
-          typeof dateValue === "string"
-            ? dateValue
-            : dateValue instanceof Date
-              ? dateValue.toISOString().split("T")[0]
-              : String(dateValue);
-
-        dates.push({
-          logical_date: dateStr,
-          label: formatDateLabel(dateStr),
-        });
-      }
-    }
-
-    return dates;
+    return rows
+      .filter((row) => row[0] != null)
+      .map((row) => {
+        const dateStr = toDateString(row[0]);
+        return { logical_date: dateStr, label: formatDateLabel(dateStr) };
+      });
   });
 }
 
@@ -151,7 +131,7 @@ function formatDateLabel(dateStr: string): string {
  * Get all data for a specific logical date.
  */
 export async function getDayData(logicalDate: string): Promise<DayData> {
-  return withConnection(async (conn) => {
+  return withDB(async (conn) => {
     // Get window events
     const windowResult = await conn.run(
       `
@@ -252,7 +232,7 @@ export async function getOverview(
   toDate?: string,
   limit: number = 30
 ): Promise<DailySummary[]> {
-  return withConnection(async (conn) => {
+  return withDB(async (conn) => {
     let query = `
       SELECT 
         w.logical_date,
@@ -290,10 +270,7 @@ export async function getOverview(
     const rows = await result.getRows();
 
     return rows.map((row) => ({
-      logical_date:
-        row[0] instanceof Date
-          ? row[0].toISOString().split("T")[0]
-          : String(row[0]),
+      logical_date: toDateString(row[0]),
       total_keys: Number(row[1]),
       unique_apps: Number(row[2]),
     }));
@@ -306,7 +283,7 @@ export async function getOverview(
 export async function getAppUsageForDate(
   logicalDate: string
 ): Promise<{ app_name: string; duration_seconds: number; event_count: number }[]> {
-  return withConnection(async (conn) => {
+  return withDB(async (conn) => {
     // Get events with calculated durations using window functions
     const result = await conn.run(
       `
@@ -346,27 +323,6 @@ export async function getAppUsageForDate(
 }
 
 /**
- * Helper for write operations - needs write access
- */
-async function withWriteConnection<T>(
-  fn: (conn: DuckDBConnection) => Promise<T>
-): Promise<T> {
-  if (!existsSync(DB_PATH)) {
-    throw new Error(`Database not found: ${DB_PATH}. Run the tracker first to create it.`);
-  }
-  
-  const instance = await DuckDBInstance.create(DB_PATH);
-  const conn = await instance.connect();
-  
-  try {
-    return await fn(conn);
-  } finally {
-    conn.closeSync();
-    instance.closeSync();
-  }
-}
-
-/**
  * Add a note at a specific timestamp.
  */
 export async function addNote(
@@ -374,16 +330,19 @@ export async function addNote(
   content: string,
   logicalDate: string
 ): Promise<void> {
-  return withWriteConnection(async (conn) => {
-    await conn.run(
-      `
+  return withDB(
+    async (conn) => {
+      await conn.run(
+        `
       INSERT INTO notes (timestamp, content, logical_date)
       VALUES (?::TIMESTAMP, ?, ?::DATE)
       ON CONFLICT (timestamp) DO UPDATE SET content = excluded.content
     `,
-      [timestamp, content, logicalDate]
-    );
-  });
+        [timestamp, content, logicalDate]
+      );
+    },
+    { readOnly: false }
+  );
 }
 
 /**
@@ -393,23 +352,26 @@ export async function saveBlog(
   logicalDate: string,
   content: string
 ): Promise<void> {
-  return withWriteConnection(async (conn) => {
-    await conn.run(
-      `
+  return withDB(
+    async (conn) => {
+      await conn.run(
+        `
       INSERT INTO daily_blog (logical_date, content)
       VALUES (?::DATE, ?)
       ON CONFLICT (logical_date) DO UPDATE SET content = excluded.content
     `,
-      [logicalDate, content]
-    );
-  });
+        [logicalDate, content]
+      );
+    },
+    { readOnly: false }
+  );
 }
 
 /**
  * Get settings from the database.
  */
 export async function getSettings(): Promise<Record<string, unknown>> {
-  return withConnection(async (conn) => {
+  return withDB(async (conn) => {
     const result = await conn.run(`
       SELECT key, value FROM settings
     `);
@@ -437,15 +399,18 @@ export async function updateSetting(
   key: string,
   value: unknown
 ): Promise<void> {
-  return withWriteConnection(async (conn) => {
-    await conn.run(
-      `
+  return withDB(
+    async (conn) => {
+      await conn.run(
+        `
       INSERT INTO settings (key, value)
       VALUES (?, ?::JSON)
       ON CONFLICT (key) DO UPDATE SET value = excluded.value
     `,
-      [key, JSON.stringify(value)]
-    );
-  });
+        [key, JSON.stringify(value)]
+      );
+    },
+    { readOnly: false }
+  );
 }
 

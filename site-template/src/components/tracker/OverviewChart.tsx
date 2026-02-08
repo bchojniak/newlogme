@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import {
   ChartConfig,
@@ -6,12 +6,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-
-interface DailySummary {
-  logical_date: string;
-  total_keys: number;
-  unique_apps: number;
-}
+import { type DailySummary } from "./shared";
 
 interface Props {
   days: DailySummary[];
@@ -49,7 +44,7 @@ export function OverviewChart({ days }: Props) {
 
   if (days.length === 0) {
     return (
-      <div className="h-[300px] flex items-center justify-center text-slate-500">
+      <div className="h-[300px] flex items-center justify-center text-stone-400">
         No data available
       </div>
     );
@@ -61,19 +56,19 @@ export function OverviewChart({ days }: Props) {
         <CartesianGrid
           vertical={false}
           strokeDasharray="3 3"
-          stroke="#334155"
+          stroke="#e7e5e4"
         />
         <XAxis
           dataKey="dateLabel"
           tickLine={false}
           axisLine={false}
-          tick={{ fill: "#64748b", fontSize: 11 }}
+          tick={{ fill: "#a8a29e", fontSize: 11 }}
           interval="preserveStartEnd"
         />
         <YAxis
           tickLine={false}
           axisLine={false}
-          tick={{ fill: "#64748b", fontSize: 12 }}
+          tick={{ fill: "#a8a29e", fontSize: 12 }}
           width={50}
           tickFormatter={(value) => {
             if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
@@ -85,12 +80,12 @@ export function OverviewChart({ days }: Props) {
             if (!active || !payload?.length) return null;
             const data = payload[0].payload;
             return (
-              <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-xl">
-                <p className="text-slate-100 font-medium">{data.dateLabel}</p>
-                <p className="text-cyan-400">
+              <div className="bg-white border border-stone-200 rounded-lg p-3 shadow-lg">
+                <p className="text-stone-900 font-medium">{data.dateLabel}</p>
+                <p className="text-[#D4735E]">
                   {data.keystrokes.toLocaleString()} keystrokes
                 </p>
-                <p className="text-blue-400">{data.apps} apps</p>
+                <p className="text-[#2A9D8F]">{data.apps} apps</p>
               </div>
             );
           }}

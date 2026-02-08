@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Card,
@@ -10,19 +10,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Settings, TrendingUp, Calendar, Keyboard } from "lucide-react";
-import { OverviewChart } from "@/components/ulogme/OverviewChart";
-import { HackingStreak } from "@/components/ulogme/HackingStreak";
-
-interface DateInfo {
-  logical_date: string;
-  label: string;
-}
-
-interface DailySummary {
-  logical_date: string;
-  total_keys: number;
-  unique_apps: number;
-}
+import { OverviewChart } from "@/components/tracker/OverviewChart";
+import { HackingStreak } from "@/components/tracker/HackingStreak";
+import type { DateInfo, DailySummary } from "@/components/tracker/shared";
 
 export default function Overview() {
   const [dates, setDates] = useState<DateInfo[]>([]);
@@ -31,8 +21,8 @@ export default function Overview() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/ulogme/dates").then((r) => r.json()),
-      fetch("/api/ulogme/overview?limit=30").then((r) => r.json()),
+      fetch("/api/tracker/dates").then((r) => r.json()),
+      fetch("/api/tracker/overview?limit=30").then((r) => r.json()),
     ])
       .then(([datesData, overviewData]) => {
         setDates(datesData.dates || []);
@@ -52,7 +42,7 @@ export default function Overview() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background p-6">
+      <div className="min-h-screen bg-white p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           <Skeleton className="h-12 w-64" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -67,27 +57,25 @@ export default function Overview() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-slate-100">
+    <div className="min-h-screen bg-white text-stone-900">
       {/* Header */}
-      <header className="border-b border-slate-800/50 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-50">
+      <header className="border-b border-stone-200 bg-white sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-                ulogme
+              <img src="/favicon.png" alt="Time Tracker" width={28} height={28} className="size-7 rounded" />
+              <h1 className="text-2xl font-bold text-[#D4735E]">
+                Time Tracker
               </h1>
-              <span className="text-slate-500 text-sm">
-                Personal Activity Tracker
-              </span>
             </div>
 
             <Button
               variant="ghost"
               size="icon"
               asChild
-              className="text-slate-400 hover:text-slate-100"
+              className="text-stone-400 hover:text-stone-900"
             >
-              <Link to="/settings">
+              <Link to="/settings" aria-label="Settings">
                 <Settings className="h-5 w-5" />
               </Link>
             </Button>
@@ -99,47 +87,47 @@ export default function Overview() {
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
         {/* Stats cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="bg-slate-900/50 border-slate-800/50">
+          <Card className="border-stone-200">
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-cyan-500/10">
-                  <Keyboard className="h-6 w-6 text-cyan-400" />
+                <div className="p-3 rounded-xl bg-[#D4735E]/10">
+                  <Keyboard className="h-6 w-6 text-[#D4735E]" />
                 </div>
                 <div>
-                  <p className="text-3xl font-bold text-slate-100">
+                  <p className="text-3xl font-bold text-stone-900">
                     {totalKeystrokes.toLocaleString()}
                   </p>
-                  <p className="text-sm text-slate-500">Total Keystrokes (30 days)</p>
+                  <p className="text-sm text-stone-500">Total Keystrokes (30 days)</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/50 border-slate-800/50">
+          <Card className="border-stone-200">
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-blue-500/10">
-                  <TrendingUp className="h-6 w-6 text-blue-400" />
+                <div className="p-3 rounded-xl bg-[#2A9D8F]/10">
+                  <TrendingUp className="h-6 w-6 text-[#2A9D8F]" />
                 </div>
                 <div>
-                  <p className="text-3xl font-bold text-slate-100">
+                  <p className="text-3xl font-bold text-stone-900">
                     {avgKeystrokes.toLocaleString()}
                   </p>
-                  <p className="text-sm text-slate-500">Avg. Daily Keystrokes</p>
+                  <p className="text-sm text-stone-500">Avg. Daily Keystrokes</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/50 border-slate-800/50">
+          <Card className="border-stone-200">
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-violet-500/10">
-                  <Calendar className="h-6 w-6 text-violet-400" />
+                <div className="p-3 rounded-xl bg-[#264653]/10">
+                  <Calendar className="h-6 w-6 text-[#264653]" />
                 </div>
                 <div>
-                  <p className="text-3xl font-bold text-slate-100">{activeDays}</p>
-                  <p className="text-sm text-slate-500">Active Days</p>
+                  <p className="text-3xl font-bold text-stone-900">{activeDays}</p>
+                  <p className="text-sm text-stone-500">Active Days</p>
                 </div>
               </div>
             </CardContent>
@@ -147,10 +135,10 @@ export default function Overview() {
         </div>
 
         {/* Hacking streak */}
-        <Card className="bg-slate-900/50 border-slate-800/50">
+        <Card className="border-stone-200">
           <CardHeader>
-            <CardTitle className="text-slate-100">Activity Heatmap</CardTitle>
-            <CardDescription className="text-slate-400">
+            <CardTitle className="text-stone-900">Activity Heatmap</CardTitle>
+            <CardDescription>
               Daily keystroke intensity over the past 30 days
             </CardDescription>
           </CardHeader>
@@ -160,10 +148,10 @@ export default function Overview() {
         </Card>
 
         {/* Overview chart */}
-        <Card className="bg-slate-900/50 border-slate-800/50">
+        <Card className="border-stone-200">
           <CardHeader>
-            <CardTitle className="text-slate-100">Daily Activity</CardTitle>
-            <CardDescription className="text-slate-400">
+            <CardTitle className="text-stone-900">Daily Activity</CardTitle>
+            <CardDescription>
               Keystrokes and app usage per day
             </CardDescription>
           </CardHeader>
@@ -173,10 +161,10 @@ export default function Overview() {
         </Card>
 
         {/* Day list */}
-        <Card className="bg-slate-900/50 border-slate-800/50">
+        <Card className="border-stone-200">
           <CardHeader>
-            <CardTitle className="text-slate-100">Recent Days</CardTitle>
-            <CardDescription className="text-slate-400">
+            <CardTitle className="text-stone-900">Recent Days</CardTitle>
+            <CardDescription>
               Click a day to view detailed activity
             </CardDescription>
           </CardHeader>
@@ -192,11 +180,11 @@ export default function Overview() {
                     to={`/day/${dateInfo.logical_date}`}
                     className="group"
                   >
-                    <div className="p-4 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:border-cyan-500/50 hover:bg-slate-800 transition-all">
-                      <p className="text-sm font-medium text-slate-300 group-hover:text-cyan-400 truncate">
+                    <div className="p-4 rounded-lg bg-stone-50 border border-stone-200 hover:border-[#D4735E]/50 hover:bg-[#D4735E]/5 transition-all">
+                      <p className="text-sm font-medium text-stone-700 group-hover:text-[#D4735E] truncate">
                         {dateInfo.label.split(",")[0]}
                       </p>
-                      <p className="text-xs text-slate-500 mt-1">
+                      <p className="text-xs text-stone-400 mt-1">
                         {summary?.total_keys?.toLocaleString() || 0} keys
                       </p>
                     </div>
@@ -210,4 +198,3 @@ export default function Overview() {
     </div>
   );
 }
-

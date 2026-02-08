@@ -9,7 +9,6 @@ import {
   IconFileWord,
   IconFolder,
   IconHelp,
-  IconInnerShadowTop,
   IconListDetails,
   IconReport,
   IconSearch,
@@ -159,8 +158,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
               <a href="#">
-                <IconInnerShadowTop className="!size-5" />
-                <span className="text-base font-semibold">Acme Inc.</span>
+                <img src="/favicon.png" alt="Time Tracker" className="!size-5 rounded" />
+                <span className="text-base font-semibold">Time Tracker</span>
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>

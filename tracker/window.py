@@ -7,8 +7,6 @@ CGWindowListCopyWindowInfo for window titles.
 
 import logging
 from datetime import datetime
-from typing import Callable
-
 logger = logging.getLogger(__name__)
 
 from AppKit import NSWorkspace
@@ -179,7 +177,7 @@ class WindowTracker:
                 window_title = remove_non_ascii(browser_url)
         
         # Build the name to log
-        if window_title and len(window_title) > 0:
+        if window_title:
             name_to_log = f"{self.current_app} :: {window_title}"
         else:
             name_to_log = self.current_app

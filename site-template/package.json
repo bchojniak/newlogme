@@ -1,5 +1,5 @@
 {
-  "name": "ulogme-ui",
+  "name": "time-tracker-ui",
   "type": "module",
   "scripts": {
     "clear-cache": "rm -rf node_modules/.vite",

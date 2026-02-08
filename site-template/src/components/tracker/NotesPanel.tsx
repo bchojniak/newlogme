@@ -1,12 +1,8 @@
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Clock } from "lucide-react";
-
-interface Note {
-  timestamp: string;
-  content: string;
-}
+import { type Note } from "./shared";
 
 interface Props {
   notes: Note[];
@@ -26,6 +22,10 @@ export function NotesPanel({ notes, logicalDate }: Props) {
   const [adding, setAdding] = useState(false);
   const [localNotes, setLocalNotes] = useState<Note[]>(notes);
 
+  useEffect(() => {
+    setLocalNotes(notes);
+  }, [notes]);
+
   const handleAddNote = async () => {
     if (!newNote.trim() || !logicalDate) return;
 
@@ -33,7 +33,7 @@ export function NotesPanel({ notes, logicalDate }: Props) {
     const timestamp = new Date().toISOString();
 
     try {
-      await fetch("/api/ulogme/note", {
+      await fetch("/api/tracker/note", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -59,8 +59,9 @@ export function NotesPanel({ notes, logicalDate }: Props) {
         <Input
           value={newNote}
           onChange={(e) => setNewNote(e.target.value)}
-          placeholder="Add a note..."
-          className="bg-slate-800/50 border-slate-700 text-slate-100 placeholder:text-slate-500"
+          aria-label="New note"
+          placeholder="Add a note…"
+          className="border-stone-200 text-stone-900 placeholder:text-stone-400"
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -72,7 +73,8 @@ export function NotesPanel({ notes, logicalDate }: Props) {
           onClick={handleAddNote}
           disabled={adding || !newNote.trim()}
           size="icon"
-          className="bg-cyan-600 hover:bg-cyan-500 text-white shrink-0"
+          aria-label="Add note"
+          className="bg-[#D4735E] hover:bg-[#c0654f] text-white shrink-0"
         >
           <Plus className="h-4 w-4" />
         </Button>
@@ -81,7 +83,7 @@ export function NotesPanel({ notes, logicalDate }: Props) {
       {/* Notes list */}
       <div className="space-y-2 max-h-[250px] overflow-y-auto">
         {localNotes.length === 0 ? (
-          <p className="text-slate-500 text-sm text-center py-4">
+          <p className="text-stone-400 text-sm text-center py-4">
             No notes yet. Add one above!
           </p>
         ) : (
@@ -94,13 +96,13 @@ export function NotesPanel({ notes, logicalDate }: Props) {
             .map((note, index) => (
               <div
                 key={`${note.timestamp}-${index}`}
-                className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/50"
+                className="p-3 rounded-lg bg-stone-50 border border-stone-200"
               >
-                <div className="flex items-center gap-2 text-slate-500 text-xs mb-1">
+                <div className="flex items-center gap-2 text-stone-400 text-xs mb-1">
                   <Clock className="h-3 w-3" />
                   {formatTime(note.timestamp)}
                 </div>
-                <p className="text-slate-300 text-sm">{note.content}</p>
+                <p className="text-stone-700 text-sm">{note.content}</p>
               </div>
             ))
         )}
@@ -108,4 +110,3 @@ export function NotesPanel({ notes, logicalDate }: Props) {
     </div>
   );
 }
-

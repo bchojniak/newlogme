@@ -5,7 +5,6 @@ DuckDB storage layer for ulogme.
 import json
 import logging
 from datetime import date, datetime, timedelta
-from pathlib import Path
 from typing import Any
 
 import duckdb
@@ -115,43 +114,28 @@ class Storage:
     
     def __init__(self, config: Config):
         self.config = config
-        self._schema_initialized = False
-    
-    def _get_conn(self) -> duckdb.DuckDBPyConnection:
-        """Get a fresh database connection."""
-        conn = get_connection(self.config)
-        return conn
     
     def _execute(self, query: str, params: list | None = None) -> None:
         """Execute a write query, opening and closing the connection."""
-        conn = self._get_conn()
+        conn = get_connection(self.config)
         try:
-            if params:
-                conn.execute(query, params)
-            else:
-                conn.execute(query)
+            conn.execute(query, params or [])
         finally:
             conn.close()
-    
+
     def _query(self, query: str, params: list | None = None):
         """Execute a read query, returning results."""
-        conn = self._get_conn()
+        conn = get_connection(self.config)
         try:
-            if params:
-                return conn.execute(query, params).fetchall()
-            else:
-                return conn.execute(query).fetchall()
+            return conn.execute(query, params or []).fetchall()
         finally:
             conn.close()
-    
+
     def _query_one(self, query: str, params: list | None = None):
         """Execute a read query, returning one result."""
-        conn = self._get_conn()
+        conn = get_connection(self.config)
         try:
-            if params:
-                return conn.execute(query, params).fetchone()
-            else:
-                return conn.execute(query).fetchone()
+            return conn.execute(query, params or []).fetchone()
         finally:
             conn.close()
     

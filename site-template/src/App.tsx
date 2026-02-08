@@ -1,4 +1,3 @@
-import React from "react";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/components/theme-provider";
 import DayView from "@/pages/DayView";
@@ -6,9 +5,9 @@ import Overview from "@/pages/Overview";
 import Settings from "@/pages/Settings";
 
 /**
- * ulogme - Personal Activity Tracker Dashboard
+ * Time Tracker Dashboard
  *
- * A modern rewrite of karpathy/ulogme for macOS.
+ * A personal activity tracker for macOS (based on karpathy/ulogme).
  */
 export default function App() {
   return (

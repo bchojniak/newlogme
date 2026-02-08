@@ -1,6 +1,7 @@
 import { serveStatic } from "hono/bun";
 import type { ViteDevServer } from "vite";
 import { createServer as createViteServer } from "vite";
+import { join } from "path";
 import config from "./zosite.json";
 import { Hono } from "hono";
 import { getRecentRegistrations, createRegistration } from "./backend-lib/db";
@@ -14,7 +15,7 @@ import {
   saveBlog,
   getSettings,
   updateSetting,
-} from "./backend-lib/ulogme-db";
+} from "./backend-lib/tracker-db";
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const dateSchema = z.string().regex(DATE_REGEX, "Invalid date format (expected YYYY-MM-DD)");
@@ -36,6 +37,16 @@ const app = new Hono();
 
 const mode: Mode =
   process.env.NODE_ENV === "production" ? "production" : "development";
+
+// Favicon - served before any middleware to avoid Vite intercepting it
+const FAVICON_PATH = join(import.meta.dir, "public", "favicon.png");
+app.get("/favicon.png", async (c) => {
+  const file = Bun.file(FAVICON_PATH);
+  return new Response(file, {
+    headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=3600" },
+  });
+});
+app.get("/favicon.ico", (c) => c.redirect("/favicon.png", 302));
 
 /**
  * Add any API routes here.
@@ -61,14 +72,14 @@ app.post("/api/_zo/demo/register", async (c) => {
 });
 
 // ============================================================================
-// ulogme API Routes
+// Time Tracker API Routes
 // ============================================================================
 
 /**
- * GET /api/ulogme/dates
+ * GET /api/tracker/dates
  * Returns list of available dates with data
  */
-app.get("/api/ulogme/dates", async (c) => {
+app.get("/api/tracker/dates", async (c) => {
   try {
     const dates = await getAvailableDates();
     return c.json({ dates });
@@ -79,10 +90,10 @@ app.get("/api/ulogme/dates", async (c) => {
 });
 
 /**
- * GET /api/ulogme/day/:logicalDate
+ * GET /api/tracker/day/:logicalDate
  * Returns all data for a specific logical date
  */
-app.get("/api/ulogme/day/:logicalDate", async (c) => {
+app.get("/api/tracker/day/:logicalDate", async (c) => {
   try {
     const parsed = dateSchema.safeParse(c.req.param("logicalDate"));
     if (!parsed.success) {
@@ -97,10 +108,10 @@ app.get("/api/ulogme/day/:logicalDate", async (c) => {
 });
 
 /**
- * GET /api/ulogme/day/:logicalDate/apps
+ * GET /api/tracker/day/:logicalDate/apps
  * Returns app usage breakdown with durations for a date
  */
-app.get("/api/ulogme/day/:logicalDate/apps", async (c) => {
+app.get("/api/tracker/day/:logicalDate/apps", async (c) => {
   try {
     const parsed = dateSchema.safeParse(c.req.param("logicalDate"));
     if (!parsed.success) {
@@ -115,10 +126,10 @@ app.get("/api/ulogme/day/:logicalDate/apps", async (c) => {
 });
 
 /**
- * GET /api/ulogme/overview
+ * GET /api/tracker/overview
  * Returns aggregated stats across a date range
  */
-app.get("/api/ulogme/overview", async (c) => {
+app.get("/api/tracker/overview", async (c) => {
   try {
     const from = c.req.query("from");
     const to = c.req.query("to");
@@ -135,10 +146,10 @@ app.get("/api/ulogme/overview", async (c) => {
 });
 
 /**
- * POST /api/ulogme/note
+ * POST /api/tracker/note
  * Add a note at a specific timestamp
  */
-app.post("/api/ulogme/note", async (c) => {
+app.post("/api/tracker/note", async (c) => {
   try {
     const body = await c.req.json();
     const parsed = noteSchema.safeParse(body);
@@ -155,10 +166,10 @@ app.post("/api/ulogme/note", async (c) => {
 });
 
 /**
- * PUT /api/ulogme/blog/:logicalDate
+ * PUT /api/tracker/blog/:logicalDate
  * Save or update the daily blog
  */
-app.put("/api/ulogme/blog/:logicalDate", async (c) => {
+app.put("/api/tracker/blog/:logicalDate", async (c) => {
   try {
     const dateParsed = dateSchema.safeParse(c.req.param("logicalDate"));
     if (!dateParsed.success) return c.json({ error: "Invalid date format" }, 400);
@@ -178,10 +189,10 @@ app.put("/api/ulogme/blog/:logicalDate", async (c) => {
 });
 
 /**
- * GET /api/ulogme/settings
+ * GET /api/tracker/settings
  * Get all settings
  */
-app.get("/api/ulogme/settings", async (c) => {
+app.get("/api/tracker/settings", async (c) => {
   try {
     const settings = await getSettings();
     return c.json(settings);
@@ -192,10 +203,10 @@ app.get("/api/ulogme/settings", async (c) => {
 });
 
 /**
- * PUT /api/ulogme/settings
+ * PUT /api/tracker/settings
  * Update settings
  */
-app.put("/api/ulogme/settings", async (c) => {
+app.put("/api/tracker/settings", async (c) => {
   try {
     const body = await c.req.json();
     const parsed = settingsSchema.safeParse(body);
@@ -244,8 +255,6 @@ export default { fetch: app.fetch, port, hostname: "127.0.0.1", idleTimeout: 255
  */
 function configureProduction(app: Hono) {
   app.use("/assets/*", serveStatic({ root: "./dist" }));
-  app.use("/favicon.svg", serveStatic({ path: "./favicon.svg" }));
-  app.get("/favicon.ico", (c) => c.redirect("/favicon.svg", 302));
   app.use(async (c, next) => {
     if (c.req.method !== "GET") {
       return next();
@@ -267,25 +276,23 @@ function configureProduction(app: Hono) {
  * - Mirrors production routing semantics so SPA routes behave consistently.
  */
 async function configureDevelopment(app: Hono): Promise<ViteDevServer> {
+  // Close any previous Vite instance left over from a Bun --hot reload.
+  // globalThis survives hot reloads, so we use it as a cleanup mechanism.
+  const prev = (globalThis as any).__vite as ViteDevServer | undefined;
+  if (prev) {
+    await prev.close().catch(() => {});
+  }
+
   const vite = await createViteServer({
     server: { middlewareMode: true, hmr: false, ws: false },
     appType: "custom",
   });
 
+  (globalThis as any).__vite = vite;
+
   app.use("*", async (c, next) => {
     if (c.req.path.startsWith("/api/")) {
       return next();
-    }
-
-    if (c.req.path === "/favicon.ico") {
-      return c.redirect("/favicon.svg", 302);
-    }
-
-    if (c.req.path === "/favicon.svg") {
-      const file = Bun.file("./favicon.svg");
-      if (await file.exists()) {
-        return new Response(file);
-      }
     }
 
     const url = c.req.path;

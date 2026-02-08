@@ -18,7 +18,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 from AppKit import NSApplication, NSApplicationActivationPolicyAccessory
-from Foundation import NSTimer, NSObject
+from Foundation import NSObject
 from PyObjCTools import AppHelper
 
 from .config import Config, load_config
@@ -28,24 +28,8 @@ from .keyboard import KeystrokeCounter, setup_keystroke_monitoring, remove_keyst
 
 
 class DaemonDelegate(NSObject):
-    """NSApplication delegate for the daemon."""
-    
-    tracker: WindowTracker | None = None
-    counter: KeystrokeCounter | None = None
-    verbose: bool = False
-    
-    def applicationDidFinishLaunching_(self, notification) -> None:
-        """Called when the application has finished launching."""
-        pass
-    
-    def pollCallback_(self, timer) -> None:
-        """Periodic callback for polling window and flushing keystrokes."""
-        if self.verbose:
-            logger.debug("poll tick")
-        if self.tracker is not None:
-            self.tracker.poll()
-        if self.counter is not None:
-            self.counter.poll()
+    """NSApplication delegate for the daemon (required for event loop)."""
+    pass
 
 
 class Daemon:
@@ -93,12 +77,8 @@ class Daemon:
         app = NSApplication.sharedApplication()
         app.setActivationPolicy_(NSApplicationActivationPolicyAccessory)
         
-        # Create delegate
+        # Create delegate (required for the NSApplication event loop)
         self._delegate = DaemonDelegate.alloc().init()
-        self._delegate.tracker = self.tracker
-        self._delegate.counter = self.counter
-        self._delegate.verbose = self.verbose
-        
         app.setDelegate_(self._delegate)
         
         # Purge old data if retention is configured
@@ -265,31 +245,32 @@ def stop_daemon(config: Config | None = None) -> None:
         logger.info("ulogme daemon is not running")
         return
 
-    if pid is not None:
-        logger.info("Stopping ulogme daemon (PID: %d)...", pid)
-        try:
-            os.kill(pid, signal.SIGTERM)
+    if pid is None:
+        return
 
-            # Wait for process to stop
-            for _ in range(10):
-                time.sleep(0.5)
-                try:
-                    os.kill(pid, 0)
-                except ProcessLookupError:
-                    logger.info("ulogme daemon stopped")
-                    release_pid_lock(config)
-                    return
+    logger.info("Stopping ulogme daemon (PID: %d)...", pid)
+    try:
+        os.kill(pid, signal.SIGTERM)
 
-            # Force kill if still running
+        # Wait for process to stop
+        for _ in range(10):
+            time.sleep(0.5)
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                logger.info("ulogme daemon stopped")
+                break
+        else:
+            # Force kill if still running after all retries
             os.kill(pid, signal.SIGKILL)
             logger.info("ulogme daemon killed")
-            release_pid_lock(config)
-        except ProcessLookupError:
-            logger.info("ulogme daemon was already stopped")
-            release_pid_lock(config)
-        except PermissionError:
-            logger.error("Permission denied stopping process %d", pid)
-            sys.exit(1)
+    except ProcessLookupError:
+        logger.info("ulogme daemon was already stopped")
+    except PermissionError:
+        logger.error("Permission denied stopping process %d", pid)
+        sys.exit(1)
+
+    release_pid_lock(config)
 
 
 def check_status(config: Config | None = None) -> None:
