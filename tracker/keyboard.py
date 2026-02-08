@@ -11,7 +11,7 @@ import time
 from datetime import datetime
 from typing import Any
 
-from AppKit import NSEvent, NSKeyDownMask
+from AppKit import NSEvent, NSEventTypeKeyDown, NSKeyDownMask
 
 from .config import Config
 from .storage import Storage
@@ -40,7 +40,7 @@ class KeystrokeCounter:
     
     def _handle_key_event(self, event) -> None:
         """Handle a key down event by incrementing the counter."""
-        if event.type() == NSKeyDownMask >> 16:  # NSKeyDown event type
+        if event.type() == NSEventTypeKeyDown:
             with self._lock:
                 self._count += 1
 
